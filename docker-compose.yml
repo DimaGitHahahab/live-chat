@@ -1,0 +1,96 @@
+services:
+  zoo:
+    image: confluentinc/cp-zookeeper:7.3.2
+    hostname: zoo
+    container_name: zoo
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_SERVERS: zoo:2888:3888
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    healthcheck:
+      test: nc -z localhost 9092 || exit -1
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+      - "9999:9999"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: "zoo:2181"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: ${DOCKER_HOST_IP:-127.0.0.1}
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+    depends_on:
+      - zoo
+  messages-db:
+    image: 'postgres:latest'
+    container_name: messages-db
+    hostname: messages-db
+    env_file:
+      - storage-service/.env
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+  chat:
+    container_name: chat
+    build:
+      context: chat-service
+      dockerfile: chat-service/Dockerfile
+    env_file:
+      - chat-service/.env
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  messages-cache:
+    container_name: messages-cache
+    hostname: messages-cache
+    image: redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+    ports:
+      - "6379:6379"
+
+  chat-storage:
+    hostname: chat-storage
+    container_name: chat-storage
+    build:
+      context: storage-service
+      dockerfile: storage-service/Dockerfile
+    ports:
+      - "8081:8081"
+    env_file:
+      - storage-service/.env
+    depends_on:
+      kafka:
+        condition: service_healthy
+      messages-db:
+        condition: service_healthy
+      messages-cache:
+        condition: service_healthy
