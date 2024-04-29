@@ -1,0 +1,56 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-chat-service-client:
+    name: Build Chat Service Client Side
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Build
+      run: go build -v ./cmd/client/main.go
+      working-directory: chat-service
+
+  build-chat-service-server:
+      name: Build Chat Service Server Side
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v4
+  
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+  
+      - name: Build
+        run: go build -v ./cmd/server/main.go
+        working-directory: chat-service
+
+  build-chat-storage-service:
+      name: Build Chat Storage Service
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v4
+  
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          
+      - name: Build
+        run: go build -v ./cmd/main.go
+        working-directory: storage-service
