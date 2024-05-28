@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strings"
 
@@ -19,7 +20,7 @@ func New(cfg *config.Config) *Server {
 
 	return &Server{
 		httpServer: &http.Server{
-			Addr:    ":" + cfg.HttpPort,
+			Addr:    net.JoinHostPort("", cfg.HttpPort),
 			Handler: handler.NewChatHandler(chatService),
 		},
 	}
